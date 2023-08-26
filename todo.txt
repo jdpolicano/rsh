@@ -1,0 +1,18 @@
+
+Enable configurable bracketed paste support eventually. 
+https://en.wikipedia.org/wiki/Bracketed-paste#:~:text=Bracketed%20paste%20(sometimes%20referred%20to,differently%20from%20text%20typed%20normally.
+https://cirw.in/blog/bracketed-paste
+http://www.xfree86.org/4.7.0/ctlseqs.html#Bracketed%20Paste%20Mode
+
+
+Steps to create a basic repl that supports arrow keys + ctrl (for moving to beginning or end of line), ctrl-c (cancel), ascii input only (tbd), 
+
+This tutorial on building a text editor will likely be super useful...https://viewsourcecode.org/snaptoken/kilo/index.html
+
+1. terminal interface should be able to turn on raw mode (https://www.gnu.org/software/mit-scheme/documentation/stable/mit-scheme-ref/Terminal-Mode.html#:~:text=In%20raw%20mode%2C%20characters%20are,terminal%20by%20the%20operating%20system.)
+This should allow the terminal interface to read directly from user input before it is reflected in the terminal, thus controlling the 
+output the user sees. Right now, in cooked mode (canonical mode), the user input is sent when the user presses enter. This is fine
+for handling backspaces and input, but it makes it impossible to handle more ocmplicated keypresses like arrow keys...
+
+2. terminal interface should be able to effect cursor movements (still researching)...
+This is how I'd like to handle the various arrow keys etc...this way the user can live edit as they 
