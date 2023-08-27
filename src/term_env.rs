@@ -12,8 +12,9 @@ use termios::{
     INPCK,
     ISTRIP,
     CS8,
+    VMIN,
+    VTIME,
     TCSAFLUSH, 
-    tcsetattr
 };
 
 use std::os::fd::RawFd;
@@ -146,20 +147,30 @@ impl EnvBuilder {
             .i_exten(false)
             .i_xon(false)
             .i_crnl(false)
-            .o_post(false) // assuming println! does some magic here...
+            .o_post(false) 
             .brkint(false)
             .inpck(false)
             .i_strip(false)
             .cs8(true)
     }
+
+    pub fn set_vmin(mut self, min: u8) -> EnvBuilder {
+        self.transform_state.c_cc[VMIN] = min;
+        self
+    }
     
+    pub fn set_vtime(mut self, time: u8) -> EnvBuilder {
+        self.transform_state.c_cc[VTIME] = time;
+        self
+    }
+
     pub fn set_env(self) ->  Result<EnvBuilder, io::Error> {
-        tcsetattr(self.fd, TCSAFLUSH, &self.transform_state)?;
+        termios::tcsetattr(self.fd, TCSAFLUSH, &self.transform_state)?;
         Ok(self)
     }
 
     pub fn restore(self) ->  Result<(), io::Error> {
-        tcsetattr(self.fd, TCSAFLUSH, &self.original_state)?;
+        termios::tcsetattr(self.fd, TCSAFLUSH, &self.original_state)?;
         Ok(())
     }
 }
