@@ -1,2 +1,3 @@
-pub mod term_interface;
-pub mod term_env;
+pub mod terminal;
+pub mod environment;
+pub mod keyboard;

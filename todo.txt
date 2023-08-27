@@ -8,6 +8,8 @@ http://www.xfree86.org/4.7.0/ctlseqs.html#Bracketed%20Paste%20Mode
 Steps to create a basic repl that supports arrow keys + ctrl (for moving to beginning or end of line), ctrl-c (cancel), ascii input only (tbd), 
 
 This tutorial on building a text editor will likely be super useful...https://viewsourcecode.org/snaptoken/kilo/index.html
+VT100 escape sequences used - https://en.wikipedia.org/wiki/VT100
+
 
 1. terminal interface should be able to turn on raw mode (https://www.gnu.org/software/mit-scheme/documentation/stable/mit-scheme-ref/Terminal-Mode.html#:~:text=In%20raw%20mode%2C%20characters%20are,terminal%20by%20the%20operating%20system.)
 This should allow the terminal interface to read directly from user input before it is reflected in the terminal, thus controlling the 
