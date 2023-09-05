@@ -1,4 +1,5 @@
 use std::io::{self, Read};
+use crate::keystroke::{KeyPress};
 
 pub struct KeyBoardReader<R> {
     input: R,
@@ -17,7 +18,7 @@ impl <R: Read> KeyBoardReader <R> {
         }
     }
 
-    pub fn read_key_press(&mut self) -> ReadResult {
+    fn read_key_press(&mut self) -> ReadResult {
         let mut c = [0];
         match self.input.read(&mut c) {
             Ok(num_bytes) => {
@@ -31,14 +32,36 @@ impl <R: Read> KeyBoardReader <R> {
         }
     }
 
-    pub fn process_key_press(&mut self) -> Option<u8> {
+    // non-blocking read for one char, can return none...tranfroms it into a keypress.
+    pub fn read_key(&mut self) -> Result<Option<KeyPress>, io::Error> {
         match self.read_key_press() {
-            ReadResult::Data(byte) => Some(byte),
-            ReadResult::NoData => None,
+            ReadResult::Data(byte) => {
+                Ok(Some(KeyPress::new(byte)))
+            },
+            ReadResult::NoData => { 
+                Ok(None)
+            },
             ReadResult::Error(io_err) => {
                 println!("{}", io_err);
-                None
+                Err(io_err)
             }
         }
     }
+
+    // Blocking version of read key...
+    /// to-do handle errors...
+    pub fn read_key_wait(&mut self) -> Result<KeyPress, io::Error> {
+        loop {
+            match self.read_key_press() {
+                ReadResult::Data(byte) => {
+                    return Ok(KeyPress::new(byte));
+                },
+                ReadResult::NoData => { continue },
+                ReadResult::Error(io_err) => {
+                    println!("{}", io_err);
+                    return Err(io_err);
+                }
+            }
+        }
+    } 
 }
