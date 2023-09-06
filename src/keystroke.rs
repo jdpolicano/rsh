@@ -41,6 +41,7 @@ impl KeyPress {
             '\x1d' => KeyPress(KeyCode::from_control(KeyType::GroupSeparator, c)),
             '\x1e' => KeyPress(KeyCode::from_control(KeyType::RecordSeparator, c)),
             '\x1f' => KeyPress(KeyCode::from_control(KeyType::UnitSeparator, c)),
+            '\x7f' => KeyPress(KeyCode::from_control(KeyType::Delete, c)),
             _ => KeyPress(KeyCode::from_control(KeyType::NoOp, c)) // catch all...
         }
     }
@@ -127,6 +128,8 @@ pub enum KeyType {
     RecordSeparator,
     UnitSeparator,
     Space,
+    // some terminals will send 0x7f for backspace, others will send 0x08, others may send an escape sequence...
+    Delete,
     Char,  // For any other character
     NoOp, // any character that can't be caputured here...
 }

@@ -5,7 +5,7 @@ pub struct KeyBoardReader<R> {
     input: R,
 }
 
-pub enum ReadResult {
+enum ReadResult {
     Data(u8),
     NoData,
     Error(io::Error),
