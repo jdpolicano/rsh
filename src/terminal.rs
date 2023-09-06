@@ -41,7 +41,6 @@ impl<R: Read, W: Write> Terminal<R, W> {
             match self.reader.read_key() {
                 Ok(Some(key)) => self.handle_key_press(key),
                 Err(io_err) => {
-                    println!("\r{}", io_err);
                     // Handle io errors, for now using a placeholder
                     todo!("Handle io errors....");
                 }
@@ -56,6 +55,8 @@ impl<R: Read, W: Write> Terminal<R, W> {
     }
 
     fn handle_key_press(&mut self, key: KeyPress) {
+        println!("handling key {}\r", key.get_byte());
+
         match key.get_type() {
             KeyType::Char => {
                 if self.cursor_col == self.dimensions.cols {
@@ -78,7 +79,6 @@ impl<R: Read, W: Write> Terminal<R, W> {
             },
 
             KeyType::Escape => {
-                println!("handling escape \r");
                 self.handle_escape_sequence();
             },
 
@@ -125,7 +125,6 @@ impl<R: Read, W: Write> Terminal<R, W> {
                 },
                 _ => {} // handle other escape sequences if needed
             }
-            self.refresh();
         }
     }
 
