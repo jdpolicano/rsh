@@ -19,9 +19,7 @@ fn main() {
 
         let mut dimensions = Dimensions::new();
         let mut terminal = Terminal::new(stdin, stdout, dimensions);
-        let after_buffer = terminal.run();
+        terminal.read_line();
         term_env.restore().unwrap();
-
-        println!("{:#?}", after_buffer[0]);
     }
 }
