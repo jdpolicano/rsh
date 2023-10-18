@@ -1,5 +1,5 @@
-use std::io::{self, BufWriter, Write, Read};
-use std::collections::VecDeque;
+use std::io::{Write, Read};
+
 use crate::keyboard::KeyBoardReader;
 use crate::linefeed::{LineFeed, ComponentState};
 use crate::dimensions::Dimensions;
@@ -26,14 +26,14 @@ impl<R: Read, W: Write> Terminal<R, W> {
                     match self.component.handle_key_press(key) {
                         ComponentState::Error | ComponentState::Stop => { 
                             self.should_exit = true;
-                            let mut res = self.component.get_buffer_as_str();
+                            let res = self.component.get_buffer_as_str();
                             println!("\n\r{}\r", res);                        
                         },
 
                         _ => { self.should_exit = false; }
                     };
                 },
-                Err(io_err) => {
+                Err(_io_err) => {
                     // Handle io errors, for now using a placeholder
                     todo!("Handle io errors....");
                 }

@@ -46,7 +46,7 @@ impl<W: Write> LineFeed<W> {
 
 
     pub fn handle_key_press(&mut self, key: InputType) -> ComponentState {
-        let mut state = match key {
+        let state = match key {
             InputType::Ascii(ascii_key) => {
                 self.handle_ascii_key(ascii_key)
             },
@@ -193,7 +193,7 @@ impl<W: Write> LineFeed<W> {
     // should render the buffer to the screen.
     fn render(&mut self) {
         for i in 0..self.dimensions.rows {
-            if (self.buffer[i].len() == 0) {
+            if self.buffer[i].len() == 0 {
                 break;
             }
 
