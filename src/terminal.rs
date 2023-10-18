@@ -26,6 +26,8 @@ impl<R: Read, W: Write> Terminal<R, W> {
                     match self.component.handle_key_press(key) {
                         ComponentState::Error | ComponentState::Stop => { 
                             self.should_exit = true;
+                            let mut res = self.component.get_buffer_as_str();
+                            println!("\n\r{}\r", res);                        
                         },
 
                         _ => { self.should_exit = false; }

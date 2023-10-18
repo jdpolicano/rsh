@@ -10,7 +10,7 @@ This will likely get used in the future for other programs, but for now it's jus
 pub enum ComponentState {
     Continue,
     Error,
-    Stop
+    Stop,
 }
 
 /*
@@ -77,6 +77,34 @@ impl<W: Write> LineFeed<W> {
             }
         }
     }
+    /*
+    Should get the current buffer as a contiguous slice of chars.
+    */
+    pub fn get_buffer(&self) -> Vec<char> {
+        let mut buffer = Vec::with_capacity(self.dimensions.rows * self.dimensions.cols);
+        for row in &self.buffer {
+            for col in row {
+                buffer.push(*col);
+            }
+        };
+
+        buffer
+    }
+    /*
+    Should get the current buffer as a contiguous slice of chars.
+    */
+    pub fn get_buffer_as_str(&self) -> String {
+        let mut buffer_str = String::with_capacity(self.dimensions.rows * self.dimensions.cols);
+
+        for row in &self.buffer {
+            for col in row {
+                buffer_str.push(*col);
+            }
+        };
+
+        buffer_str
+    }
+
 
     fn handle_ascii_key(&mut self, key: AsciiKey) -> ComponentState {
         match key {
@@ -155,7 +183,6 @@ impl<W: Write> LineFeed<W> {
         }
     }
 
-    // should correct buffer's row/col if its out of bounds.
     fn adjust_row_col(&mut self) {
         if self.cursor_col >= self.dimensions.cols {
             self.cursor_col = 0;
