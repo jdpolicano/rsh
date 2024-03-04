@@ -1,8 +1,6 @@
 // Purpose: Dimensions of the screen.
 use libc::{c_int, winsize, ioctl, STDOUT_FILENO, TIOCGWINSZ};
-use std:: {
-    process::Command
-};
+use std::process::Command;
 
 /// Represents the dimensions of the screen.
 ///

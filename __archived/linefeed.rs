@@ -31,7 +31,7 @@ impl<W: Write> LineFeed<W> {
     pub fn new(writer: W, dimensions: Dimensions) -> Self {
         let mut buffer = Vec::with_capacity(dimensions.rows);
 
-        for _ in 0..dimensions.rows {
+       for _ in 0..dimensions.rows {
             buffer.push(VecDeque::with_capacity(dimensions.cols));
         }
 
@@ -160,18 +160,18 @@ impl<W: Write> LineFeed<W> {
     }
 
     fn refresh(&mut self) {
-        self.normalize_buffer();
+        self.resize_buffer();
         self.hide_cursor();
         self.render();
         self.move_cursor(self.cursor_row as u8 + 1, self.cursor_col as u8 + 1);
         self.show_cursor();
-        self.writer.flush();
+        self.writer.flush().unwrap();
     }
 
     /*
-    Normalize an  handles overflow when the text is longer than the terminal width on insert. 
+    Normalize and handles overflow when the text is longer than the terminal width on insert. 
     */
-    fn normalize_buffer(&mut self) {
+    fn resize_buffer(&mut self) {
         for row in 0..self.dimensions.rows - 1 {
             let row_len = self.buffer[row].len();
             if row_len > self.dimensions.cols {
@@ -183,12 +183,6 @@ impl<W: Write> LineFeed<W> {
         }
     }
 
-    fn adjust_row_col(&mut self) {
-        if self.cursor_col >= self.dimensions.cols {
-            self.cursor_col = 0;
-            self.cursor_row += 1;
-        }
-    }
 
     // should render the buffer to the screen.
     fn render(&mut self) {
@@ -209,11 +203,7 @@ impl<W: Write> LineFeed<W> {
             println!("{}", io_err);
         }
     }
-
-    fn erase_all(&mut self) {
-        self.write_bytes("\x1b[2J".as_bytes());
-    }
-
+    
     fn erase_current_row(&mut self) {
         self.write_bytes("\x1b[K".as_bytes());
     }

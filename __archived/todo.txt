@@ -1,4 +1,3 @@
-
 Enable configurable bracketed paste support eventually. 
 https://en.wikipedia.org/wiki/Bracketed-paste#:~:text=Bracketed%20paste%20(sometimes%20referred%20to,differently%20from%20text%20typed%20normally.
 https://cirw.in/blog/bracketed-paste

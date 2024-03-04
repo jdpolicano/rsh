@@ -237,8 +237,7 @@ impl EscapeSequence {
             EscapeSequence::F10 => "\x1b[21~".to_string(),
             EscapeSequence::F11 => "\x1b[23~".to_string(),
             EscapeSequence::F12 => "\x1b[24~".to_string(),
-            // Fine to panic for now. Will address this later...
-            _ => panic!("Can't convert non-escape sequence to escape sequence"), 
+            EscapeSequence::NoOp => "".to_string(),
         }
     }
 
