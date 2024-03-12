@@ -40,6 +40,33 @@ pub enum RshNode {
     },
 }
 
+impl RshNode {
+    pub fn is_background(&self) -> bool {
+        match self {
+            RshNode::Background { .. } => true,
+            _ => false,
+        }
+    }
+
+    pub fn get_name(&self) -> Option<&str> {
+        match self {
+            RshNode::Command { name, .. } =>Some(name),
+            RshNode::Redirect { command, .. } => command.get_name(),
+            RshNode::Background { command } => command.get_name(),
+            _ => None,
+        }
+    }
+
+    pub fn get_args(&self) -> Option<&[String]> {
+        match self {
+            RshNode::Command { args, .. } => Some(args),
+            RshNode::Redirect { command, .. } => command.get_args(),
+            RshNode::Background { command } => command.get_args(),
+            _ => None,
+        }
+    }
+}
+
 pub struct Parser<'src> {
     tokenizer: Tokenizer<'src>,
 }
@@ -213,6 +240,47 @@ mod integration {
                     }),
                 }),
             })
+        });
+    }
+
+    #[test]
+    fn test_parser_pipe_multiple_background_deep() {
+        let input = "ls -l|grep .rs|wc -l&|something|something else";
+        let mut parser = Parser::new(input);
+        let result = parser.parse();
+        assert!(result.is_ok());
+        let unwrapped = result.unwrap();
+
+        // a | b | c
+        assert_eq!(unwrapped, RshNode::Pipe {
+            left: Box::new(RshNode::Command {
+                name: "ls".to_string(),
+                args: vec!["-l".to_string()],
+            }),
+            right: Box::new(RshNode::Pipe {
+                left: Box::new(RshNode::Command {
+                    name: "grep".to_string(),
+                    args: vec![".rs".to_string()],
+                }),
+                right: Box::new(RshNode::Pipe {
+                    left: Box::new(RshNode::Background {
+                        command: Box::new(RshNode::Command {
+                            name: "wc".to_string(),
+                            args: vec!["-l".to_string()],
+                        }),
+                    }),
+                    right: Box::new(RshNode::Pipe {
+                        left: Box::new(RshNode::Command {
+                            name: "something".to_string(),
+                            args: vec![],
+                        }),
+                        right: Box::new(RshNode::Command {
+                            name: "something".to_string(),
+                            args: vec!["else".to_string()],
+                        }),
+                    }),
+                }),
+            }),
         });
     }
 

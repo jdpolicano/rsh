@@ -1,6 +1,8 @@
-use crate::engine::{ Engine, EngineOutput };
+use crate::engine::{ Engine, EngineCtx, EngineOutput };
 use crate::parser::{ Parser, ParseError };
-use std::io::{ self, Write };
+use std::process;
+use std::io::{ self, Write, BufRead, BufReader };
+use std::thread;
 use rustyline;
 
 #[derive(Debug)]
@@ -53,8 +55,8 @@ impl Rsh {
                         let mut parser = Parser::new(&line);
                         let root = parser.parse()?;
                         let engine = Engine::new(root);
-                        let proc = engine.execute();
-                        self.handle_proc_result(proc);
+                        let mut prog = engine.execute();
+                        self.handle_prog_result(&mut prog);
                     }
                 }
                 Err(err) => { 
@@ -67,25 +69,27 @@ impl Rsh {
         Ok(())
     }
 
-    fn handle_proc_result(&self, child_result: EngineOutput) {
-        match child_result {
-            EngineOutput::Single(child_result) => {
-                child_result.as_ref().map_err(|e| {
-                    println!("{}", e);
+    fn handle_prog_result(&self, ctx: &mut EngineCtx) -> Result<(), io::Error> {
+        if let Some(mut c) = ctx.take_last_child() {
+
+            let stdout = c.stdout.take().expect("child did not have a handle to stdout");
+
+            let reader = BufReader::new(stdout);
+        
+            // Use a separate thread to read the child's stdout
+            thread::spawn(move || {
+                reader.lines().for_each(|line| {
+                    if let Ok(l) = line {
+                        println!("{}", l);
+                    }
                 });
-                
-                if child_result.is_ok() {
-                    let child = child_result.unwrap();
-                    let result = child.wait_with_output().unwrap();
-                    io::stdout().write_all(&result.stdout).unwrap();
-                    io::stdout().flush().unwrap();
-                    io::stderr().write_all(&result.stderr).unwrap();
-                    io::stdout().flush().unwrap();
-                } 
-            },
-            EngineOutput::Pipe(left_result, right_result) => {
-       
-            },
+            });
+        
+            // Wait for the child process to finish.
+            c.wait()?;
+            return Ok(());
         }
+
+        return Ok(());
     }
 }

@@ -1,11 +1,67 @@
 use crate::parser::{ RshNode, RedirectMode };
 use std::process::{ self };
 use std::io::{ self };
-
+use std::fs::{ File, OpenOptions };
+use std::os::fd::AsFd;
 
 pub enum EngineOutput {
     Single(io::Result<process::Child>),
     Pipe(io::Result<process::Child>, io::Result<process::Child>),
+}
+
+
+/**
+* The context that the engine will use to execute commands. Keeps track of the number of commands executed
+keeps refs to all of the children, and other useful information.
+*/
+#[derive(Debug)]
+pub struct EngineCtx {
+    command_count: u32,
+    should_pipe: bool,
+    children: Vec<process::Child>,
+}
+
+impl EngineCtx {
+    pub fn new() -> EngineCtx {
+        EngineCtx {
+            command_count: 0,
+            should_pipe: false,
+            children: Vec::new(),
+        }
+    }
+
+    pub fn add_child(&mut self, child: process::Child) {
+        self.children.push(child);
+        self.command_count += 1;
+    }
+
+    pub fn get_child(&mut self, index: usize) -> Option<&process::Child> {
+        self.children.get(index)
+    }
+
+    pub fn get_child_mut(&mut self, index: usize) -> Option<&mut process::Child> {
+        self.children.get_mut(index)
+    }
+
+    pub fn get_last_child(&mut self) -> Option<&process::Child> {
+        self.children.last()
+    }
+
+    pub fn get_last_child_mut(&mut self) -> Option<&mut process::Child> {
+        self.children.last_mut()
+    }
+
+    pub fn take_last_child(&mut self) -> Option<process::Child> {
+        self.children.pop()
+    }
+
+    pub fn should_pipe(&self) -> bool {
+        self.should_pipe
+    }
+
+    pub fn set_pipe(&mut self, should_pipe: bool) {
+        self.should_pipe = should_pipe;
+    }
 }
 
 // This module is the engine that takes a syntax tree and executes it.
@@ -22,82 +78,100 @@ impl Engine {
         }
     }
 
-    pub fn execute(&self) -> EngineOutput {
-        self.execute_node(&self.root, None)
+    pub fn execute(&self) -> EngineCtx{
+        let mut ctx = EngineCtx::new();
+        self.execute_node(&self.root, &mut ctx);
+        ctx
     }
 
-    fn execute_node(&self, root: &RshNode, input: Option<EngineOutput>) -> EngineOutput {
+    fn execute_node(&self, root: &RshNode, ctx: &mut EngineCtx) {
         match root {
             RshNode::Command { name, args } => {
-                self.execute_standard_command(name, args, input)
+                if ctx.should_pipe() {
+                    self.execute_cmd_pipe(name, args, ctx);
+                } else {
+                    self.execute_cmd_std(name, args, ctx);
+                }
+            },
+
+            RshNode::Redirect { command, file, mode } => {
+                let name = command.get_name().unwrap();
+                let args = command.get_args().unwrap();
+                self.execute_cmd_redir(name, args, file, mode, ctx); 
             },
             RshNode::Pipe { left, right } => {
-                let left_output = self.execute_node(left, input); // handle if this returns a single (proc) or an (in, out) proc...
-                let left_out_channel = self.take_child(left_output, true);
-                let right_output = self.execute_node(right, Some(EngineOutput::Single(left_out_channel))); // handle if this returns a single (proc) or an (in, out) proc...
-                let right_out_channel = self.take_child(right_output, true);
-                EngineOutput::Single(right_out_channel)
+                self.execute_node(left, ctx);
+                ctx.set_pipe(true);
+                self.execute_node(right, ctx);
+                ctx.set_pipe(false);
             },
             _ => { todo!("implement the rest of the node types"); }
-            // RshNode::Redirect { command, file, mode } => {
-            //     let mut command = Command::new(command.name);
-            //     for arg in command.args {
-            //         command.arg(arg);
-            //     }
-            //     match mode {
-            //         RedirectMode::Read => {
-            //             let file = std::fs::File::open(file).expect("failed to open file");
-            //             command.stdin(file);
-            //         },
-            //         RedirectMode::Write => {
-            //             let file = std::fs::File::create(file).expect("failed to create file");
-            //             command.stdout(file);
-            //         },
-            //         RedirectMode::Append => {
-            //             let file = std::fs::OpenOptions::new().append(true).open(file).expect("failed to open file");
-            //             command.stdout(file);
-            //         },
-            //     }
-            //     command.spawn().expect("failed to execute process");
-            // },
-            // RshNode::Background { command } => {
-            //     let mut command = Command::new(command.name);
-            //     for arg in command.args {
-            //         command.arg(arg);
-            //     }
-            //     command.spawn().expect("failed to execute process");
-            // },
         }
     }
 
-    fn execute_standard_command(&self, name: &str, args: &[String], input: Option<EngineOutput>) -> EngineOutput {
+    fn execute_cmd_std(&self, name: &str, args: &[String], ctx: &mut EngineCtx) {
         let mut command = process::Command::new(name);
         for arg in args {
             command.arg(arg);
         }
 
-        if let Some(target_input) = input {
-            let input_channel_result = self.take_child(target_input, true);
-            if input_channel_result.is_ok() {
-                let input_channel = input_channel_result.unwrap();
-                command.stdin(input_channel.stdout.expect("Failed to capture stdout"));
-                command.stdout(process::Stdio::piped());
-                command.stderr(process::Stdio::piped());
-                return EngineOutput::Single(command.spawn())
-            };
-        };
-        
         command.stdin(process::Stdio::piped());
         command.stdout(process::Stdio::piped());
         command.stderr(process::Stdio::piped());
         // spawn and wait for the process to finish.
-        EngineOutput::Single(command.spawn())
+        // todo: handle the result of this failure, perhaps have an error message and stuff added to context to repoirt to the shell later?
+        let child = command.spawn().expect("failed to execute process");
+        // spawn and add the child to the context struct for tracking...
+        ctx.add_child(child);
     }
 
-    fn take_child(&self, engine_out: EngineOutput, readable: bool) -> io::Result<process::Child> {
-        match engine_out {
-            EngineOutput::Single(child) => child,
-            EngineOutput::Pipe(child_in, child_out) => if readable { child_out } else { child_in }
+
+    fn execute_cmd_redir(&self, name: &str, args: &[String], file: &str, mode: &RedirectMode, ctx: &mut EngineCtx) {
+        let mut command = process::Command::new(name);
+        for arg in args {
+            command.arg(arg);
         }
+
+        match mode {
+            RedirectMode::Read => {
+                let file = File::open(file).expect("failed to open file");
+                command.stdin(file);
+                command.stdout(process::Stdio::piped());
+                command.stderr(process::Stdio::piped());
+            },
+            RedirectMode::Write => {
+                let file = File::create(file).expect("failed to create file");
+                command.stdout(file);
+                command.stdin(process::Stdio::piped());
+                command.stderr(process::Stdio::piped());
+            },
+            RedirectMode::Append => {
+                let file = OpenOptions::new().append(true).open(file).expect("failed to open file");
+                command.stdout(file);
+                command.stdin(process::Stdio::piped());
+                command.stderr(process::Stdio::piped());
+            },
+        }
+
+        // spawn and add to the ctx obj...
+        let child = command.spawn().expect("failed to execute process");
+        ctx.add_child(child);
+    }
+
+    fn execute_cmd_pipe(&self, name: &str, args: &[String], ctx: &mut EngineCtx) {
+        let mut command = process::Command::new(name);
+        for arg in args {
+            command.arg(arg);
+        }
+
+        // is it okay to lose the last_child here? it will no longer be in the list of commands we originally executed...
+        let last_child = ctx.take_last_child().unwrap();
+
+        command.stdin(last_child.stdout.unwrap());
+        command.stdout(process::Stdio::piped());
+        command.stderr(process::Stdio::piped());
+        // spawn and wait for the process to finish.
+        let piped_child = command.spawn().expect("failed to execute process");
+        ctx.add_child(piped_child);
     }
 }
