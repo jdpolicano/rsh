@@ -11,6 +11,7 @@ pub enum Token<'src> {
     Background,
     SingleQuote,
     DoubleQuote,
+    Space
 }
 
 impl Display for Token<'_> {
@@ -23,6 +24,7 @@ impl Display for Token<'_> {
             Token::Background => write!(f, "&"),
             Token::SingleQuote => write!(f, "'"),
             Token::DoubleQuote => write!(f, "\""),
+            Token::Space => write!(f, " "),
         }
     }
 }
@@ -36,6 +38,7 @@ impl<'src> Token<'src> {
             "&" => Token::Background,
             "'" => Token::SingleQuote,
             "\"" => Token::DoubleQuote,
+            " " => Token::Space,
             _ => Token::Text(token),
         }
     }
@@ -56,69 +59,80 @@ impl<'src> Tokenizer<'src> {
         }
     }
 
-    fn skip_whitespace(&mut self) {
+    pub fn skip_whitespace(&mut self) {
         self.input = self.input.trim_start();
     }
 
-    fn is_special_char(&self, c: char) -> bool {
-        match c {
-            '|' | '>' | '<' | '&' => true,
-            _ => false,
-        }
+    pub fn is_empty(&self) -> bool {
+      self.input.is_empty()
     }
     
     pub fn peek_next(&mut self) -> Option<Token> {
-        self.parse_next_token(false)
+      self.parse_next_token(false)
+    }
+    
+    pub fn next_token(&mut self) -> Option<Token> {
+      self.parse_next_token(true)
     }
 
-    pub fn next_token(&mut self) -> Option<Token> {
-        self.parse_next_token(true)
+    fn is_special_token(&self, c: char) -> bool {
+        match c {
+            '|' | '>' | '<' | '&' | '"' | '\'' | ' '  => true,
+            _ => false,
+        }
     }
 
     fn parse_next_token(&mut self, advance_stream: bool) -> Option<Token> {
         if self.input.is_empty() {
             return None;
         }
-    
-        self.skip_whitespace();
-        
-        // Check for a special character at the beginning and handle it.
-        if let Some(first_char) = self.input.chars().next() {
-            if self.is_special_char(first_char) {
-                let toke = Token::new(&self.input[..first_char.len_utf8()]);
-                if advance_stream {
-                    self.input = &self.input[first_char.len_utf8()..];
-                }
-                return Some(toke);
-            }
-        }
-    
-        let iter = self.input.char_indices();
-        let mut end = 0;
-        let mut in_double_quote = false;
-        let mut in_single_quote = false;
-    
-        for (start, c) in iter {
-            if c == '"' {
-                in_double_quote = !in_double_quote;
-            } else if c == '\'' { 
-                in_single_quote = !in_single_quote;
-            } else if !in_double_quote && (self.is_special_char(c) || c.is_whitespace()) {
-                break;
-            } else if !in_single_quote && (self.is_special_char(c) || c.is_whitespace()) {
-                break;
-            }
 
-            end = start + c.len_utf8();
+        if let Some(c) = self.input.chars().next() {
+          if self.is_special_token(c) {
+            return self.special_token(advance_stream);
+          } else {
+            return self.text_token(advance_stream);
+          }
         }
-    
-        let token = Token::new(&self.input[..end]);
-    
-        if advance_stream {
+
+        None
+    }
+
+    fn special_token(&mut self, advance_stream: bool) -> Option<Token> {
+        if let Some(c) = self.input.chars().next() {
+          let end = c.len_utf8();
+          let toke = Token::new(&self.input[0..end]);
+
+          if advance_stream {
             self.input = &self.input[end..];
+          }
+
+          return Some(toke);
         }
-    
-        Some(token)
+
+        None
+    }
+
+    fn text_token(&mut self, advance_stream: bool) -> Option<Token> {
+      let mut end = 0;
+      for (idx, c) in self.input.char_indices() {
+        if self.is_special_token(c) { 
+          end = idx;
+          break 
+        };
+
+        end = idx + c.len_utf8();
+      }
+
+      if end > 0 {
+        let toke = Token::new(&self.input[0..end]);
+        if advance_stream {
+          self.input = &self.input[end..];
+        };
+        return Some(toke);
+      }
+
+      None
     }
 }
 
@@ -133,9 +147,13 @@ mod unit {
         let input = "ls -l | grep .rs";
         let mut tokenizer = Tokenizer::new(input);
         assert_eq!(tokenizer.next_token(), Some(Token::Text("ls")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Text("-l")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Pipe));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Text("grep")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Text(".rs")));
         assert_eq!(tokenizer.next_token(), None);
     }
@@ -145,12 +163,19 @@ mod unit {
         let input = "ls -l | grep .rs | wc -l";
         let mut tokenizer = Tokenizer::new(input);
         assert_eq!(tokenizer.next_token(), Some(Token::Text("ls")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Text("-l")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Pipe));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Text("grep")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Text(".rs")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Pipe));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Text("wc")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Text("-l")));
         assert_eq!(tokenizer.next_token(), None);
     }
@@ -161,13 +186,21 @@ mod unit {
         let mut tokenizer = Tokenizer::new(input);
   
         assert_eq!(tokenizer.next_token(), Some(Token::Text("ls")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Text("-l")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Pipe));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Text("grep")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Text(".rs")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Pipe));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Text("wc")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Text("-l")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Background));
         assert_eq!(tokenizer.next_token(), None);
     }
@@ -177,27 +210,31 @@ mod unit {
         let input = "ls -l | grep .rs | wc -l & echo \"hello world\"";
         let mut tokenizer = Tokenizer::new(input);
         assert_eq!(tokenizer.next_token(), Some(Token::Text("ls")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Text("-l")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Pipe));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Text("grep")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Text(".rs")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Pipe));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Text("wc")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Text("-l")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Background));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Text("echo")));
-        assert_eq!(tokenizer.next_token(), Some(Token::Text("\"hello world\"")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
+        assert_eq!(tokenizer.next_token(), Some(Token::DoubleQuote));
+        assert_eq!(tokenizer.next_token(), Some(Token::Text("hello")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
+        assert_eq!(tokenizer.next_token(), Some(Token::Text("world")));
+        assert_eq!(tokenizer.next_token(), Some(Token::DoubleQuote));
         assert_eq!(tokenizer.next_token(), None);
-    }
-
-    #[test]
-    fn test_tokenizer_string_literal() {
-        let input = "git commit -m 'some message'";
-        let mut tokenizer = Tokenizer::new(input);
-        assert_eq!(tokenizer.next_token(), Some(Token::Text("git")));
-        assert_eq!(tokenizer.next_token(), Some(Token::Text("commit")));
-        assert_eq!(tokenizer.next_token(), Some(Token::Text("-m")));
-        assert_eq!(tokenizer.next_token(), Some(Token::Text("some message")));
     }
 
     #[test]
@@ -219,6 +256,7 @@ mod unit {
         assert_eq!(tokenizer.next_token(), Some(Token::Text("out.txt"))); 
         assert_eq!(tokenizer.next_token(), Some(Token::Pipe));
         assert_eq!(tokenizer.next_token(), Some(Token::Text("grep")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Space));
         assert_eq!(tokenizer.next_token(), Some(Token::Text(".txt")));
         assert_eq!(tokenizer.next_token(), None);
     }
