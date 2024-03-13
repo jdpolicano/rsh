@@ -9,6 +9,8 @@ pub enum Token<'src> {
     RedirectOutput,
     RedirectInput,
     Background,
+    SingleQuote,
+    DoubleQuote,
 }
 
 impl Display for Token<'_> {
@@ -19,6 +21,8 @@ impl Display for Token<'_> {
             Token::RedirectOutput => write!(f, ">"),
             Token::RedirectInput => write!(f, "<"),
             Token::Background => write!(f, "&"),
+            Token::SingleQuote => write!(f, "'"),
+            Token::DoubleQuote => write!(f, "\""),
         }
     }
 }
@@ -30,6 +34,8 @@ impl<'src> Token<'src> {
             ">" => Token::RedirectOutput,
             "<" => Token::RedirectInput,
             "&" => Token::Background,
+            "'" => Token::SingleQuote,
+            "\"" => Token::DoubleQuote,
             _ => Token::Text(token),
         }
     }
@@ -89,16 +95,20 @@ impl<'src> Tokenizer<'src> {
     
         let iter = self.input.char_indices();
         let mut end = 0;
-        let mut in_quote = false;
+        let mut in_double_quote = false;
+        let mut in_single_quote = false;
     
         for (start, c) in iter {
             if c == '"' {
-                in_quote = !in_quote;
-            } else if !in_quote && (self.is_special_char(c) || c.is_whitespace()) {
-                // Since we're already handling special characters at the beginning,
-                // encountering one here means we're at the end of a text token.
+                in_double_quote = !in_double_quote;
+            } else if c == '\'' { 
+                in_single_quote = !in_single_quote;
+            } else if !in_double_quote && (self.is_special_char(c) || c.is_whitespace()) {
+                break;
+            } else if !in_single_quote && (self.is_special_char(c) || c.is_whitespace()) {
                 break;
             }
+
             end = start + c.len_utf8();
         }
     
@@ -178,6 +188,16 @@ mod unit {
         assert_eq!(tokenizer.next_token(), Some(Token::Text("echo")));
         assert_eq!(tokenizer.next_token(), Some(Token::Text("\"hello world\"")));
         assert_eq!(tokenizer.next_token(), None);
+    }
+
+    #[test]
+    fn test_tokenizer_string_literal() {
+        let input = "git commit -m 'some message'";
+        let mut tokenizer = Tokenizer::new(input);
+        assert_eq!(tokenizer.next_token(), Some(Token::Text("git")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Text("commit")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Text("-m")));
+        assert_eq!(tokenizer.next_token(), Some(Token::Text("some message")));
     }
 
     #[test]

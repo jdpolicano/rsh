@@ -1,7 +1,6 @@
-use crate::engine::{ Engine, EngineCtx, EngineOutput };
+use crate::engine::{ Engine, EngineCtx };
 use crate::parser::{ Parser, ParseError };
-use std::process;
-use std::io::{ self, Write, BufRead, BufReader };
+use std::io::{ self };
 use std::thread;
 use rustyline;
 
@@ -55,13 +54,17 @@ impl Rsh {
                         let mut parser = Parser::new(&line);
                         let root = parser.parse()?;
                         let engine = Engine::new(root);
-                        let mut prog = engine.execute();
-                        self.handle_prog_result(&mut prog);
+                        let prog_res = engine.execute();
+                        if let Ok(mut prog) = prog_res {
+                            let _ = self.handle_prog_result(&mut prog);
+                        } else {
+                            // handle error
+                            println!("Error: {:?}", prog_res);
+                        }
                     }
                 }
                 Err(err) => { 
-                    println!("{:?}", err);
-                    println!("No input given. Exiting...");
+                    println!("Error: {:?}", err);
                     should_stop = true;
                 },
             }
@@ -70,21 +73,27 @@ impl Rsh {
     }
 
     fn handle_prog_result(&self, ctx: &mut EngineCtx) -> Result<(), io::Error> {
+        let n = ctx.children.len();
+        for child in ctx.children[0..n - 1].iter_mut() {
+            child.wait()?;
+        }
+    
         if let Some(mut c) = ctx.take_last_child() {
+            let child_stdout = c.stdout.take();
+            let child_stderr = c.stderr.take();
 
-            let stdout = c.stdout.take().expect("child did not have a handle to stdout");
-
-            let reader = BufReader::new(stdout);
-        
-            // Use a separate thread to read the child's stdout
-            thread::spawn(move || {
-                reader.lines().for_each(|line| {
-                    if let Ok(l) = line {
-                        println!("{}", l);
-                    }
+            if let Some(mut stdout) = child_stdout {
+                thread::spawn(move || {
+                    let _ = io::copy(&mut stdout, &mut io::stdout());
                 });
-            });
-        
+            }
+
+            if let Some(mut stderr) = child_stderr {
+                thread::spawn(move || {
+                    let _ = io::copy(&mut stderr, &mut io::stderr());
+                });
+            }
+
             // Wait for the child process to finish.
             c.wait()?;
             return Ok(());

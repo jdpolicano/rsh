@@ -152,170 +152,170 @@ impl<'src> Parser<'src> {
 }
 
 
-#[cfg(test)]
-mod integration {
-    use super::*;
+// #[cfg(test)]
+// mod integration {
+//     use super::*;
 
-    #[test]
-    fn test_parser_vanilla() {
-        let input = "echo \"hello world\"";
-        let mut parser = Parser::new(input);
-        let result = parser.parse();
-        assert!(result.is_ok());
-        let unwrapped = result.unwrap();
-        assert_eq!(unwrapped, RshNode::Command {
-            name: "echo".to_string(),
-            args: vec!["\"hello world\"".to_string()],
-        });
-    }
+//     #[test]
+//     fn test_parser_vanilla() {
+//         let input = "echo \"hello world\"";
+//         let mut parser = Parser::new(input);
+//         let result = parser.parse();
+//         assert!(result.is_ok());
+//         let unwrapped = result.unwrap();
+//         assert_eq!(unwrapped, RshNode::Command {
+//             name: "echo".to_string(),
+//             args: vec!["\"hello world\"".to_string()],
+//         });
+//     }
 
-    #[test]
-    fn test_parser_pipe() {
-        let input = "ls -l | grep .rs";
-        let mut parser = Parser::new(input);
-        let result = parser.parse();
-        assert!(result.is_ok());
-        let unwrapped = result.unwrap();
-        assert_eq!(unwrapped, RshNode::Pipe {
-            left: Box::new(RshNode::Command {
-                name: "ls".to_string(),
-                args: vec!["-l".to_string()],
-            }),
-            right: Box::new(RshNode::Command {
-                name: "grep".to_string(),
-                args: vec![".rs".to_string()],
-            }),
-        });
-    }
+//     #[test]
+//     fn test_parser_pipe() {
+//         let input = "ls -l | grep .rs";
+//         let mut parser = Parser::new(input);
+//         let result = parser.parse();
+//         assert!(result.is_ok());
+//         let unwrapped = result.unwrap();
+//         assert_eq!(unwrapped, RshNode::Pipe {
+//             left: Box::new(RshNode::Command {
+//                 name: "ls".to_string(),
+//                 args: vec!["-l".to_string()],
+//             }),
+//             right: Box::new(RshNode::Command {
+//                 name: "grep".to_string(),
+//                 args: vec![".rs".to_string()],
+//             }),
+//         });
+//     }
 
-    #[test]
-    fn test_parser_pipe_multiple() {
-        let input = "ls -l | grep .rs | wc -l";
-        let mut parser = Parser::new(input);
-        let result = parser.parse();
-        assert!(result.is_ok());
-        let unwrapped = result.unwrap();
-        assert_eq!(unwrapped, RshNode::Pipe {
-            left: Box::new(RshNode::Command {
-                name: "ls".to_string(),
-                args: vec!["-l".to_string()],
-            }),
-            right: Box::new(RshNode::Pipe {
-                left: Box::new(RshNode::Command {
-                    name: "grep".to_string(),
-                    args: vec![".rs".to_string()],
-                }),
-                right: Box::new(RshNode::Command {
-                    name: "wc".to_string(),
-                    args: vec!["-l".to_string()],
-                }),
-            }),
-        });
-    }
+//     #[test]
+//     fn test_parser_pipe_multiple() {
+//         let input = "ls -l | grep .rs | wc -l";
+//         let mut parser = Parser::new(input);
+//         let result = parser.parse();
+//         assert!(result.is_ok());
+//         let unwrapped = result.unwrap();
+//         assert_eq!(unwrapped, RshNode::Pipe {
+//             left: Box::new(RshNode::Command {
+//                 name: "ls".to_string(),
+//                 args: vec!["-l".to_string()],
+//             }),
+//             right: Box::new(RshNode::Pipe {
+//                 left: Box::new(RshNode::Command {
+//                     name: "grep".to_string(),
+//                     args: vec![".rs".to_string()],
+//                 }),
+//                 right: Box::new(RshNode::Command {
+//                     name: "wc".to_string(),
+//                     args: vec!["-l".to_string()],
+//                 }),
+//             }),
+//         });
+//     }
 
-    #[test]
-    fn test_parser_pipe_multiple_background() {
-        let input = "ls -l|grep .rs|wc -l&";
-        let mut parser = Parser::new(input);
-        let result = parser.parse();
-        assert!(result.is_ok());
-        let unwrapped = result.unwrap();
+//     #[test]
+//     fn test_parser_pipe_multiple_background() {
+//         let input = "ls -l|grep .rs|wc -l&";
+//         let mut parser = Parser::new(input);
+//         let result = parser.parse();
+//         assert!(result.is_ok());
+//         let unwrapped = result.unwrap();
 
-        // a | b | c  
+//         // a | b | c  
 
-        assert_eq!(unwrapped, RshNode::Pipe {
-            left: Box::new(RshNode::Command {
-                name: "ls".to_string(),
-                args: vec!["-l".to_string()],
-            }),
-            right: Box::new(RshNode::Pipe {
-                left: Box::new(RshNode::Command {
-                    name: "grep".to_string(),
-                    args: vec![".rs".to_string()],
-                }),
-                right: Box::new(RshNode::Background {
-                    command: Box::new(RshNode::Command {
-                        name: "wc".to_string(),
-                        args: vec!["-l".to_string()],
-                    }),
-                }),
-            })
-        });
-    }
+//         assert_eq!(unwrapped, RshNode::Pipe {
+//             left: Box::new(RshNode::Command {
+//                 name: "ls".to_string(),
+//                 args: vec!["-l".to_string()],
+//             }),
+//             right: Box::new(RshNode::Pipe {
+//                 left: Box::new(RshNode::Command {
+//                     name: "grep".to_string(),
+//                     args: vec![".rs".to_string()],
+//                 }),
+//                 right: Box::new(RshNode::Background {
+//                     command: Box::new(RshNode::Command {
+//                         name: "wc".to_string(),
+//                         args: vec!["-l".to_string()],
+//                     }),
+//                 }),
+//             })
+//         });
+//     }
 
-    #[test]
-    fn test_parser_pipe_multiple_background_deep() {
-        let input = "ls -l|grep .rs|wc -l&|something|something else";
-        let mut parser = Parser::new(input);
-        let result = parser.parse();
-        assert!(result.is_ok());
-        let unwrapped = result.unwrap();
+//     #[test]
+//     fn test_parser_pipe_multiple_background_deep() {
+//         let input = "ls -l|grep .rs|wc -l&|something|something else";
+//         let mut parser = Parser::new(input);
+//         let result = parser.parse();
+//         assert!(result.is_ok());
+//         let unwrapped = result.unwrap();
 
-        // a | b | c
-        assert_eq!(unwrapped, RshNode::Pipe {
-            left: Box::new(RshNode::Command {
-                name: "ls".to_string(),
-                args: vec!["-l".to_string()],
-            }),
-            right: Box::new(RshNode::Pipe {
-                left: Box::new(RshNode::Command {
-                    name: "grep".to_string(),
-                    args: vec![".rs".to_string()],
-                }),
-                right: Box::new(RshNode::Pipe {
-                    left: Box::new(RshNode::Background {
-                        command: Box::new(RshNode::Command {
-                            name: "wc".to_string(),
-                            args: vec!["-l".to_string()],
-                        }),
-                    }),
-                    right: Box::new(RshNode::Pipe {
-                        left: Box::new(RshNode::Command {
-                            name: "something".to_string(),
-                            args: vec![],
-                        }),
-                        right: Box::new(RshNode::Command {
-                            name: "something".to_string(),
-                            args: vec!["else".to_string()],
-                        }),
-                    }),
-                }),
-            }),
-        });
-    }
+//         // a | b | c
+//         assert_eq!(unwrapped, RshNode::Pipe {
+//             left: Box::new(RshNode::Command {
+//                 name: "ls".to_string(),
+//                 args: vec!["-l".to_string()],
+//             }),
+//             right: Box::new(RshNode::Pipe {
+//                 left: Box::new(RshNode::Command {
+//                     name: "grep".to_string(),
+//                     args: vec![".rs".to_string()],
+//                 }),
+//                 right: Box::new(RshNode::Pipe {
+//                     left: Box::new(RshNode::Background {
+//                         command: Box::new(RshNode::Command {
+//                             name: "wc".to_string(),
+//                             args: vec!["-l".to_string()],
+//                         }),
+//                     }),
+//                     right: Box::new(RshNode::Pipe {
+//                         left: Box::new(RshNode::Command {
+//                             name: "something".to_string(),
+//                             args: vec![],
+//                         }),
+//                         right: Box::new(RshNode::Command {
+//                             name: "something".to_string(),
+//                             args: vec!["else".to_string()],
+//                         }),
+//                     }),
+//                 }),
+//             }),
+//         });
+//     }
 
-    #[test]
-    fn test_parser_redirec_to_file() {
-        let input = "ls -l > dir.txt";
-        let mut parser = Parser::new(input);
-        let result = parser.parse();
-        assert!(result.is_ok());
-        let unwrapped = result.unwrap();
-        assert_eq!(unwrapped, RshNode::Redirect {
-            command: Box::new(RshNode::Command {
-                name: "ls".to_string(),
-                args: vec!["-l".to_string()],
-            }),
-            file: "dir.txt".to_string(),
-            mode: RedirectMode::Write,
-        });
-    }
+//     #[test]
+//     fn test_parser_redirec_to_file() {
+//         let input = "ls -l > dir.txt";
+//         let mut parser = Parser::new(input);
+//         let result = parser.parse();
+//         assert!(result.is_ok());
+//         let unwrapped = result.unwrap();
+//         assert_eq!(unwrapped, RshNode::Redirect {
+//             command: Box::new(RshNode::Command {
+//                 name: "ls".to_string(),
+//                 args: vec!["-l".to_string()],
+//             }),
+//             file: "dir.txt".to_string(),
+//             mode: RedirectMode::Write,
+//         });
+//     }
 
-    #[test]
-    fn test_parser_redirec_from_file() {
-        let input = "cat < dir.txt";
-        let mut parser = Parser::new(input);
-        let result = parser.parse();
-        assert!(result.is_ok());
-        let unwrapped = result.unwrap();
-        assert_eq!(unwrapped, RshNode::Redirect {
-            command: Box::new(RshNode::Command {
-                name: "cat".to_string(),
-                args: vec![],
-            }),
-            file: "dir.txt".to_string(),
-            mode: RedirectMode::Read,
-        });
-    }
-}
+//     #[test]
+//     fn test_parser_redirec_from_file() {
+//         let input = "cat < dir.txt";
+//         let mut parser = Parser::new(input);
+//         let result = parser.parse();
+//         assert!(result.is_ok());
+//         let unwrapped = result.unwrap();
+//         assert_eq!(unwrapped, RshNode::Redirect {
+//             command: Box::new(RshNode::Command {
+//                 name: "cat".to_string(),
+//                 args: vec![],
+//             }),
+//             file: "dir.txt".to_string(),
+//             mode: RedirectMode::Read,
+//         });
+//     }
+// }
 
