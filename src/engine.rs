@@ -81,9 +81,13 @@ impl Engine {
         match root {
             RshNode::Command { name, args } => {
                 if ctx.should_pipe() {
-                    self.execute_cmd_pipe(name, args, ctx)?;
+                    if ctx.children.len() > 0 {
+                        self.execute_cmd_pipe(name, args, ctx)?;
+                    } else {
+                        self.execute_cmd_std(name, args, ctx)?;
+                    }
                 } else {
-                    self.execute_cmd_std(name, args, ctx)?;
+                    self.execute_cmd_inherit(name, args, ctx)?;
                 }
             },
 
@@ -92,9 +96,10 @@ impl Engine {
                 let args = command.get_args().unwrap();
                 self.execute_cmd_redir(name, args, file, mode, ctx)?; 
             },
+
             RshNode::Pipe { left, right } => {
-                self.execute_node(left, ctx)?;
                 ctx.set_pipe(true);
+                self.execute_node(left, ctx)?;
                 self.execute_node(right, ctx)?;
                 ctx.set_pipe(false);
             },
@@ -103,14 +108,20 @@ impl Engine {
         Ok(())
     }
 
-    fn execute_cmd_std(&self, name: &str, args: &[String], ctx: &mut EngineCtx) -> Result<(), io::Error> {
+    fn execute_cmd_inherit(&self, name: &str, args: &[String], ctx: &mut EngineCtx) -> Result<(), io::Error> {
         let mut command = self.setup_command(name, args); 
-        self.setup_io::<Stdio>(&mut command, Some(Stdio::inherit()), None, None);
         let child = command.spawn()?;
         ctx.add_child(child);
         Ok(())
     }
 
+    fn execute_cmd_std(&self, name: &str, args: &[String], ctx: &mut EngineCtx) -> Result<(), io::Error> {
+        let mut command = self.setup_command(name, args); 
+        self.setup_io::<Stdio>(&mut command, None, None, None);
+        let child = command.spawn()?;
+        ctx.add_child(child);
+        Ok(())
+    }
 
     fn execute_cmd_redir(&self, name: &str, args: &[String], file: &str, mode: &RedirectMode, ctx: &mut EngineCtx) -> Result<(), io::Error> {
         let mut command = self.setup_command(name, args); 
@@ -143,11 +154,9 @@ impl Engine {
             self.setup_io::<ChildStdout>(&mut command, Some(stdout), None, None);
             let piped_child = command.spawn()?;
             ctx.add_child(piped_child);
-            return Ok(())
         }
-
-        // todo handle this gracefully...
-        unreachable!()
+        
+        return Ok(())
     }
 
     fn setup_command(&self, name: &str, args: &[String]) -> Command {

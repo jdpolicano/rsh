@@ -42,12 +42,14 @@ impl Rsh {
 
     pub fn run(&mut self) -> Result<(), RshError>{
         let mut should_stop = false;
+        // to-do - handle history and completion
         let mut rl = rustyline::DefaultEditor::new()?;
 
         while !should_stop {
             let readline = rl.readline(&self.prompt);
             match readline {
                 Ok(line) => {
+                    // todo - handle builtins like cd, exit, etc.
                     if line == "exit" {
                         should_stop = true;
                     } else {
@@ -73,11 +75,6 @@ impl Rsh {
     }
 
     fn handle_prog_result(&self, ctx: &mut EngineCtx) -> Result<(), io::Error> {
-        let n = ctx.children.len();
-        for child in ctx.children[0..n - 1].iter_mut() {
-            child.wait()?;
-        }
-    
         if let Some(mut c) = ctx.take_last_child() {
             let child_stdout = c.stdout.take();
             let child_stderr = c.stderr.take();
